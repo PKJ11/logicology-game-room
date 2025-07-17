@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Users, Clock, Calendar, Settings } from "lucide-react";
 import { Room2D } from "@/components/Room2D";
 import { BookingModal } from "@/components/BookingModal";
+import { useQuery } from "@tanstack/react-query";
+import { roomService } from "@/services/room.service";
+import { format } from "date-fns";
 
 interface RoomViewerProps {
   roomId: string;
@@ -19,30 +22,27 @@ interface BookingData {
   isFullTable?: boolean;
 }
 
-const roomData = {
-  "room-a": {
-    name: "Room A",
-    description: "Classic rectangular and square tables",
-    tables: 8,
-    currentBookings: 12
-  },
-  "room-b": {
-    name: "Room B", 
-    description: "Circular tables for strategic gameplay",
-    tables: 6,
-    currentBookings: 8
-  },
-  "room-c": {
-    name: "Room C",
-    description: "Hexagonal tables for unique experiences", 
-    tables: 10,
-    currentBookings: 15
-  }
-};
-
 export function RoomViewer({ roomId, onBack }: RoomViewerProps) {
   const [selectedBooking, setSelectedBooking] = useState<BookingData | null>(null);
-  const room = roomData[roomId as keyof typeof roomData];
+  
+  // Fetch room data
+  const { data: room, isLoading, isError } = useQuery({
+    queryKey: ['room', roomId],
+    queryFn: () => roomService.getRoomById(roomId)
+  });
+
+  // Fetch availability data
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const { data: availability } = useQuery({
+    queryKey: ['room-availability', roomId, today],
+    queryFn: () => roomService.getRoomAvailability(today),
+    enabled: !!roomId
+  });
+
+  const roomAvailability = availability?.find(avail => avail.roomId === roomId);
+  const availableTables = roomAvailability?.availableTables ?? 0;
+  const totalTables = room?.tables?.length ?? 0;
+  const currentBookings = totalTables - availableTables;
 
   const handleSeatClick = (tableId: string, seatId: string, tableName: string, seatNumber: number) => {
     setSelectedBooking({
@@ -61,6 +61,28 @@ export function RoomViewer({ roomId, onBack }: RoomViewerProps) {
       isFullTable: true
     });
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading room data...</div>;
+  }
+
+  if (isError || !room) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="gaming-card">
+          <CardHeader>
+            <CardTitle>Error loading room</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={onBack} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Rooms
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-gaming">
@@ -85,9 +107,11 @@ export function RoomViewer({ roomId, onBack }: RoomViewerProps) {
             </div>
             
             <div className="flex items-center gap-4">
-              <Badge className="status-available">
+              <Badge className={room.status === 'ACTIVE' ? 
+                (availableTables > 0 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800") : 
+                "bg-gray-100 text-gray-800"}>
                 <Users className="h-3 w-3 mr-1" />
-                {room.tables - Math.floor(room.currentBookings / 4)} Available Tables
+                {availableTables} Available Tables
               </Badge>
               <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4 mr-2" />
@@ -138,15 +162,15 @@ export function RoomViewer({ roomId, onBack }: RoomViewerProps) {
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Total Tables</span>
-                  <span className="font-medium">{room.tables}</span>
+                  <span className="font-medium">{totalTables}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Active Bookings</span>
-                  <span className="font-medium">{room.currentBookings}</span>
+                  <span className="font-medium">{currentBookings}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Available Seats</span>
-                  <span className="font-medium text-success">{(room.tables * 4) - room.currentBookings}</span>
+                  <span className="text-sm text-muted-foreground">Capacity</span>
+                  <span className="font-medium">{room.capacity} people</span>
                 </div>
               </CardContent>
             </Card>
@@ -156,40 +180,35 @@ export function RoomViewer({ roomId, onBack }: RoomViewerProps) {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  Current Session
+                  Operating Hours
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Today, Dec 16, 2024</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>3:00 PM - 5:00 PM</span>
+                  <span>{room.openingTime} - {room.closingTime}</span>
                 </div>
-                <div className="mt-4 p-3 rounded-lg bg-warning/10 border border-warning/20">
-                  <div className="text-sm font-medium text-warning">Next Available</div>
-                  <div className="text-sm text-muted-foreground">5:00 PM - 7:00 PM</div>
+                <div className="mt-4 p-3 rounded-lg bg-muted/10 border border-muted/20">
+                  <div className="text-sm font-medium">Current Time</div>
+                  <div className="text-sm text-muted-foreground">
+                    {format(new Date(), 'h:mm a')}
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
+            {/* Amenities */}
             <Card className="gaming-card">
               <CardHeader>
-                <CardTitle className="text-lg">Quick Book</CardTitle>
+                <CardTitle className="text-lg">Amenities</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full btn-electric" size="sm">
-                  Book Next Available
-                </Button>
-                <Button variant="outline" className="w-full" size="sm">
-                  View Schedule
-                </Button>
-                <Button variant="outline" className="w-full" size="sm">
-                  Create Group Booking
-                </Button>
+              <CardContent className="space-y-2">
+                {room.amenities.map((amenity) => (
+                  <div key={amenity} className="flex items-center gap-2 text-sm">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <span>{amenity}</span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </div>

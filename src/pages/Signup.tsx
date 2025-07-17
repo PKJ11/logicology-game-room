@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Gamepad2, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { authService } from "@/services/auth.service";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function Signup() {
   const [formData, setFormData] = useState({
@@ -18,22 +21,54 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const signupMutation = useMutation({
+    mutationFn: () => authService.signup({
+      username: formData.fullName,
+      email: formData.email,
+      password: formData.password
+    }),
+    onSuccess: () => {
+      toast({
+        title: "Account created successfully",
+        description: "Welcome to GameSpace! You can now log in.",
+      });
+      navigate("/login");
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Signup failed",
+        description: error.response?.data?.message || "Something went wrong",
+      });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match!");
+      toast({
+        variant: "destructive",
+        title: "Password mismatch",
+        description: "Passwords don't match!",
+      });
       return;
     }
     if (!agreeToTerms) {
-      alert("Please agree to the terms and conditions");
+      toast({
+        variant: "destructive",
+        title: "Terms not accepted",
+        description: "Please agree to the terms and conditions",
+      });
       return;
     }
-    console.log("Signup attempt:", formData);
+    signupMutation.mutate();
   };
 
   return (

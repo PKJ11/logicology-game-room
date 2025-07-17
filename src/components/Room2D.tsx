@@ -1,7 +1,9 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Clock } from "lucide-react";
+import { Users, Clock, DollarSign } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { roomService } from "@/services/room.service";
 
 interface Room2DProps {
   roomId: string;
@@ -10,180 +12,145 @@ interface Room2DProps {
 }
 
 interface Table {
-  id: string;
-  type: string;
-  name: string;
-  seats: number;
-  status: "available" | "booked" | "current";
-  position: { row: number; col: number };
+  _id: string;
+  roomId: string;
+  tableNumber: string;
+  capacity: number;
+  gameType: string;
+  isAvailable: boolean;
+  hourlyRate: number;
+  createdAt: string;
 }
 
-// Room layouts with 2D grid positioning
-const roomLayouts = {
-  "room-a": [
-    { id: "table-1", type: "rectangle", name: "Table 1", seats: 4, status: "available", position: { row: 0, col: 0 } },
-    { id: "table-2", type: "rectangle", name: "Table 2", seats: 4, status: "booked", position: { row: 0, col: 1 } },
-    { id: "table-3", type: "square", name: "Table 3", seats: 4, status: "available", position: { row: 0, col: 2 } },
-    { id: "table-4", type: "square", name: "Table 4", seats: 4, status: "current", position: { row: 1, col: 0 } },
-    { id: "table-5", type: "rectangle", name: "Table 5", seats: 4, status: "available", position: { row: 1, col: 1 } },
-    { id: "table-6", type: "rectangle", name: "Table 6", seats: 4, status: "available", position: { row: 1, col: 2 } },
-    { id: "table-7", type: "square", name: "Table 7", seats: 4, status: "booked", position: { row: 2, col: 0 } },
-    { id: "table-8", type: "square", name: "Table 8", seats: 4, status: "available", position: { row: 2, col: 1 } },
-  ],
-  "room-b": [
-    { id: "table-1", type: "circle", name: "Table 1", seats: 6, status: "available", position: { row: 0, col: 0 } },
-    { id: "table-2", type: "circle", name: "Table 2", seats: 6, status: "booked", position: { row: 0, col: 1 } },
-    { id: "table-3", type: "circle", name: "Table 3", seats: 4, status: "current", position: { row: 1, col: 0 } },
-    { id: "table-4", type: "circle", name: "Table 4", seats: 4, status: "available", position: { row: 1, col: 1 } },
-    { id: "table-5", type: "circle", name: "Table 5", seats: 6, status: "available", position: { row: 2, col: 0 } },
-    { id: "table-6", type: "circle", name: "Table 6", seats: 6, status: "available", position: { row: 2, col: 1 } },
-  ],
-  "room-c": [
-    { id: "table-1", type: "hexagon", name: "Table 1", seats: 6, status: "available", position: { row: 0, col: 0 } },
-    { id: "table-2", type: "hexagon", name: "Table 2", seats: 6, status: "booked", position: { row: 0, col: 1 } },
-    { id: "table-3", type: "hexagon", name: "Table 3", seats: 6, status: "current", position: { row: 0, col: 2 } },
-    { id: "table-4", type: "pentagon", name: "Table 4", seats: 5, status: "available", position: { row: 1, col: 0 } },
-    { id: "table-5", type: "pentagon", name: "Table 5", seats: 5, status: "available", position: { row: 1, col: 1 } },
-    { id: "table-6", type: "hexagon", name: "Table 6", seats: 6, status: "available", position: { row: 1, col: 2 } },
-    { id: "table-7", type: "hexagon", name: "Table 7", seats: 6, status: "booked", position: { row: 2, col: 0 } },
-    { id: "table-8", type: "hexagon", name: "Table 8", seats: 6, status: "available", position: { row: 2, col: 1 } },
-    { id: "table-9", type: "pentagon", name: "Table 9", seats: 5, status: "available", position: { row: 2, col: 2 } },
-    { id: "table-10", type: "pentagon", name: "Table 10", seats: 5, status: "available", position: { row: 3, col: 1 } },
-  ]
-};
-
-const getTableIcon = (type: string) => {
-  switch (type) {
-    case "rectangle":
-      return "⬜";
-    case "square":
-      return "🟦";
-    case "circle":
-      return "🟢";
-    case "hexagon":
-      return "⬡";
-    case "pentagon":
-      return "⬟";
+const getGameIcon = (gameType: string) => {
+  switch (gameType.toLowerCase()) {
+    case "pool":
+      return "🎱";
+    case "foosball":
+      return "⚽";
+    case "air hockey":
+      return "🏒";
+    case "ping pong":
+      return "🏓";
+    case "chess":
+      return "♟️";
+    case "board games":
+      return "🎲";
     default:
-      return "⬜";
+      return "🕹️";
   }
 };
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "available":
-      return "status-available";
-    case "booked":
-      return "status-booked";
-    case "current":
-      return "status-current";
-    default:
-      return "status-available";
-  }
+const getStatusColor = (isAvailable: boolean) => {
+  return isAvailable ? "bg-green-100 text-green-800" : "bg-destructive/20 text-destructive-foreground";
 };
 
-const getStatusText = (status: string) => {
-  switch (status) {
-    case "available":
-      return "Available";
-    case "booked":
-      return "Booked";
-    case "current":
-      return "In Session";
-    default:
-      return "Available";
-  }
+const getStatusText = (isAvailable: boolean) => {
+  return isAvailable ? "Available" : "Occupied";
 };
 
 export function Room2D({ roomId, onSeatClick, onTableClick }: Room2DProps) {
-  const tables = roomLayouts[roomId as keyof typeof roomLayouts] || [];
-  
-  // Create a grid layout
-  const maxRows = Math.max(...tables.map(t => t.position.row)) + 1;
-  const maxCols = Math.max(...tables.map(t => t.position.col)) + 1;
-  
-  const grid = Array(maxRows).fill(null).map(() => Array(maxCols).fill(null));
-  
-  tables.forEach(table => {
-    grid[table.position.row][table.position.col] = table;
+  const { data: tables, isLoading } = useQuery({
+    queryKey: ['room-tables', roomId],
+    queryFn: () => roomService.getRoomTables(roomId)
   });
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div>Loading tables...</div>
+      </div>
+    );
+  }
+
+  if (!tables || tables.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div>No tables found for this room</div>
+      </div>
+    );
+  }
+
+  // Create a simple grid layout (3 columns)
+  const rows = [];
+  for (let i = 0; i < tables.length; i += 3) {
+    rows.push(tables.slice(i, i + 3));
+  }
 
   return (
     <div className="w-full h-full p-6">
-      <div className="grid gap-4" style={{ gridTemplateRows: `repeat(${maxRows}, 1fr)` }}>
-        {grid.map((row, rowIndex) => (
-          <div key={rowIndex} className="grid gap-4" style={{ gridTemplateColumns: `repeat(${maxCols}, 1fr)` }}>
-            {row.map((table: Table | null, colIndex) => (
-              <div key={`${rowIndex}-${colIndex}`} className="aspect-square">
-                {table ? (
-                  <Card className={`gaming-card h-full cursor-pointer transition-all duration-200 hover:scale-105 ${
-                    table.status === 'available' ? 'hover:border-success/50' :
-                    table.status === 'booked' ? 'border-destructive/50' :
-                    'border-warning/50'
-                  }`}>
-                    <div className="h-full p-4 flex flex-col justify-between">
-                      {/* Table Header */}
-                      <div className="text-center">
-                        <div className="text-3xl mb-2">{getTableIcon(table.type)}</div>
-                        <h3 className="font-semibold text-sm">{table.name}</h3>
-                        <Badge className={`text-xs ${getStatusColor(table.status)}`}>
-                          {getStatusText(table.status)}
+      <div className="grid gap-4">
+        {rows.map((row, rowIndex) => (
+          <div key={rowIndex} className="grid grid-cols-3 gap-4">
+            {row.map((table: Table) => (
+              <div key={table._id} className="aspect-square">
+                <Card className={`gaming-card h-full cursor-pointer transition-all duration-200 hover:scale-105 ${
+                  table.isAvailable ? 'hover:border-success/50' : 'border-destructive/50'
+                }`}>
+                  <div className="h-full p-4 flex flex-col justify-between">
+                    {/* Table Header */}
+                    <div className="text-center">
+                      <div className="text-3xl mb-2">{getGameIcon(table.gameType)}</div>
+                      <h3 className="font-semibold text-sm">{table.tableNumber}</h3>
+                      <div className="flex justify-center gap-2 mt-1">
+                        <Badge className={`text-xs ${getStatusColor(table.isAvailable)}`}>
+                          {getStatusText(table.isAvailable)}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          ${table.hourlyRate}/hr
                         </Badge>
                       </div>
-                      
-                      {/* Seats */}
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Users className="h-3 w-3" />
-                          <span>{table.seats} seats</span>
-                        </div>
-                        
-                        {/* Seat Grid */}
-                        <div className="grid grid-cols-2 gap-1 w-full">
-                          {Array.from({ length: table.seats }, (_, i) => (
-                            <Button
-                              key={i}
-                              variant="ghost"
-                              size="sm"
-                              className={`h-6 text-xs p-0 ${
-                                table.status === 'available' ? 'hover:bg-success/20' :
-                                table.status === 'booked' ? 'bg-destructive/20 cursor-not-allowed' :
-                                'bg-warning/20 cursor-not-allowed'
-                              }`}
-                              disabled={table.status !== 'available'}
-                              onClick={() => onSeatClick(table.id, `seat-${i + 1}`, table.name, i + 1)}
-                            >
-                              {i + 1}
-                            </Button>
-                          ))}
-                        </div>
+                    </div>
+                    
+                    {/* Game Info */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                        <span>Capacity: {table.capacity}</span>
                       </div>
                       
-                      {/* Book Entire Table */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs"
-                        disabled={table.status !== 'available'}
-                        onClick={() => onTableClick(table.id, table.name)}
-                      >
-                        Book Table
-                      </Button>
+                      <div className="text-sm font-medium capitalize">
+                        {table.gameType}
+                      </div>
                       
-                      {/* Time Info */}
-                      {table.status === 'current' && (
-                        <div className="flex items-center justify-center gap-1 text-xs text-warning mt-1">
-                          <Clock className="h-3 w-3" />
-                          <span>Until 5 PM</span>
-                        </div>
-                      )}
+                      {/* Seat Grid */}
+                      <div className="grid grid-cols-2 gap-1 w-full">
+                        {Array.from({ length: table.capacity }, (_, i) => (
+                          <Button
+                            key={i}
+                            variant="ghost"
+                            size="sm"
+                            className={`h-6 text-xs p-0 ${
+                              table.isAvailable ? 'hover:bg-success/20' : 'bg-destructive/20 cursor-not-allowed'
+                            }`}
+                            disabled={!table.isAvailable}
+                            onClick={() => onSeatClick(table._id, `seat-${i + 1}`, table.tableNumber, i + 1)}
+                          >
+                            Seat {i + 1}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
-                  </Card>
-                ) : (
-                  <div className="h-full border-2 border-dashed border-muted/20 rounded-lg flex items-center justify-center">
-                    <span className="text-muted-foreground/50 text-xs">Empty</span>
+                    
+                    {/* Book Entire Table */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      disabled={!table.isAvailable}
+                      onClick={() => onTableClick(table._id, table.tableNumber)}
+                    >
+                      {table.isAvailable ? (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3" />
+                          Book Table (${table.hourlyRate}/hr)
+                        </span>
+                      ) : (
+                        "Currently Occupied"
+                      )}
+                    </Button>
                   </div>
-                )}
+                </Card>
               </div>
             ))}
           </div>

@@ -5,16 +5,39 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Gamepad2, Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { authService } from "@/services/auth.service";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const loginMutation = useMutation({
+    mutationFn: () => authService.login({ email, password }),
+    onSuccess: () => {
+      toast({
+        title: "Login successful",
+        description: "Welcome back to GameSpace!",
+      });
+      navigate("/");
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.response?.data?.message || "Something went wrong",
+      });
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login attempt:", { email, password });
+    loginMutation.mutate();
   };
 
   return (
