@@ -1,66 +1,57 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { authService } from '@/services/auth.service';
+import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 
-interface User {
-  id: string;
+type User = {
+  name: string;
   email: string;
-  username: string;
-}
+  // Add other user properties as needed
+};
 
-interface AuthContextType {
+type AuthContextType = {
   user: User | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  signup: (data: { username: string; email: string; password: string }) => Promise<void>;
-}
+  isAuthenticated: boolean;
+  login: (token: string, userData: User) => void;
+  logout: () => void;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
+  
+  // Check for token in localStorage when component mounts
   useEffect(() => {
-    checkAuth();
+    const token = localStorage.getItem('token');
+    console.log("user Token:", token);
+    if (token) {
+      // You might want to verify the token here or fetch user data
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    }
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        const userData = await authService.getCurrentUser();
-        setUser(userData);
-      }
-    } catch (error) {
-      localStorage.removeItem('token');
-    } finally {
-      setIsLoading(false);
-    }
+  const login = (token: string, userData: User) => {
+    localStorage.setItem('jwtToken', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
   };
 
-  const login = async (email: string, password: string) => {
-    const response = await authService.login({ email, password });
-    setUser(response.user);
-  };
-
-  const signup = async (data: { username: string; email: string; password: string }) => {
-    const response = await authService.signup(data);
-    setUser(response.user);
-  };
-
-  const logout = async () => {
-    await authService.logout();
+  const logout = () => {
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('user');
     setUser(null);
-    localStorage.removeItem('token');
   };
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, signup }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+  const value = {
+    user,
+    isAuthenticated: !!user,
+    login,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

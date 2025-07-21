@@ -1,3 +1,4 @@
+import { json } from 'stream/consumers';
 import api from './api';
 
 export interface LoginCredentials {
@@ -14,6 +15,7 @@ export const authService = {
     const response = await api.post('/auth/login', credentials);
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', response.data.username);
     }
     return response.data;
   },

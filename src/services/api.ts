@@ -1,13 +1,13 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'https://gaming-room-backend.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add a request interceptor for JWT token
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
