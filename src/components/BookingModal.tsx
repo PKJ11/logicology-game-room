@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, Clock, Users, User, Calendar as CalendarIcon } from "lucide-react";
+import { format, parseISO, addHours } from "date-fns";
+import { useToast } from "@/components/ui/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { bookingService, type TimeSlot } from "@/services/booking.service";
 
 interface BookingData {
   tableId: string;
@@ -22,37 +26,79 @@ interface BookingModalProps {
   onConfirm: (bookingDetails: any) => void;
 }
 
-const timeSlots = [
-  "9:00 AM - 11:00 AM",
-  "11:00 AM - 1:00 PM", 
-  "1:00 PM - 3:00 PM",
-  "3:00 PM - 5:00 PM",
-  "5:00 PM - 7:00 PM",
-  "7:00 PM - 9:00 PM",
-  "9:00 PM - 11:00 PM"
-];
+const formatTimeSlot = (slot: TimeSlot) => {
+  const start = format(parseISO(slot.startTime), 'h:mm a');
+  const end = format(parseISO(slot.endTime), 'h:mm a');
+  return `${start} - ${end}`;
+};
 
 export function BookingModal({ booking, onClose, onConfirm }: BookingModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
   const [playerCount, setPlayerCount] = useState<string>("1");
+  const { toast } = useToast();
+
+  // Fetch available time slots when date changes
+  const { data: slotsData, isLoading: isSlotsLoading } = useQuery({
+  queryKey: ['available-slots', booking.tableId, selectedDate],
+  queryFn: () => bookingService.getAvailableSlots(
+    booking.tableId,
+    format(selectedDate!, 'yyyy-MM-dd')
+  ),
+  enabled: !!selectedDate,
+});
+
+// The API returns the full response object, so extract availableSlots
+const availableSlots = (slotsData?.availableSlots || []).map(slot => ({
+  ...slot,
+  available: true // Add the missing available property
+}));
+  
+
+  // Create booking mutation
+  const createBookingMutation = useMutation({
+    mutationFn: bookingService.createBooking,
+    onSuccess: (data) => {
+      toast({
+        title: "🎉 Booking Confirmed!",
+        description: (
+          <div>
+            <p>Your booking for {booking.tableName} has been confirmed!</p>
+            <p className="font-medium mt-1">
+              {format(parseISO(data.startTime), 'EEEE, MMMM d')} from{' '}
+              {format(parseISO(data.startTime), 'h:mm a')} to{' '}
+              {format(parseISO(data.endTime), 'h:mm a')}
+            </p>
+          </div>
+        ),
+        duration: 5000, // Show for 5 seconds
+      });
+      onConfirm(data);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Booking Failed",
+        description: error.response?.data?.message || "Something went wrong",
+      });
+    },
+  });
 
   const handleConfirm = () => {
     if (!selectedDate || !selectedTimeSlot) return;
 
     const bookingDetails = {
-      ...booking,
-      date: selectedDate,
-      timeSlot: selectedTimeSlot,
-      playerCount: parseInt(playerCount),
-      bookingId: `booking-${Date.now()}`,
-      timestamp: new Date()
+      tableId: booking.tableId,
+      startTime: selectedTimeSlot.startTime,
+      endTime: selectedTimeSlot.endTime,
+      numberOfPlayers: parseInt(playerCount),
+      ...(booking.seatId && { seatId: booking.seatId }),
     };
 
-    onConfirm(bookingDetails);
+    createBookingMutation.mutate(bookingDetails);
   };
 
-  const isFormValid = selectedDate && selectedTimeSlot && playerCount;
+  const isFormValid = selectedDate && selectedTimeSlot && playerCount && !createBookingMutation.isPending;
 
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
@@ -133,15 +179,24 @@ export function BookingModal({ booking, onClose, onConfirm }: BookingModalProps)
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Select value={selectedTimeSlot} onValueChange={setSelectedTimeSlot}>
+                <Select
+                  value={selectedTimeSlot ? JSON.stringify(selectedTimeSlot) : ""}
+                  onValueChange={(value) => setSelectedTimeSlot(JSON.parse(value))}
+                  disabled={isSlotsLoading}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose time slot" />
+                    <SelectValue placeholder={isSlotsLoading ? "Loading..." : "Choose time slot"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {timeSlots.map((slot) => (
-                      <SelectItem key={slot} value={slot}>
-                        {slot}
-                      </SelectItem>
+                    {availableSlots
+                      .filter(slot => slot.available)
+                      .map((slot) => (
+                        <SelectItem 
+                          key={slot.startTime} 
+                          value={JSON.stringify(slot)}
+                        >
+                          {formatTimeSlot(slot)}
+                        </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -191,15 +246,21 @@ export function BookingModal({ booking, onClose, onConfirm }: BookingModalProps)
         <div className="mt-4 p-4 rounded-lg bg-muted/30 border border-border/50">
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">
-              {booking.isFullTable ? "Table reservation" : "Seat reservation"} (2 hours)
+              {booking.isFullTable ? "Table reservation" : "Seat reservation"}
+              {selectedTimeSlot && ` (${format(parseISO(selectedTimeSlot.startTime), 'h:mm a')} - ${format(parseISO(selectedTimeSlot.endTime), 'h:mm a')})`}
             </span>
             <span className="font-bold text-lg">
-              ${booking.isFullTable ? "40" : "10"}
+              ${booking.isFullTable ? (parseInt(playerCount) * 15) : "10"}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Includes table/seat, basic game library access, and refreshments
+            Includes {booking.isFullTable ? "table" : "seat"}, game library access, and complimentary refreshments
           </p>
+          {createBookingMutation.isError && (
+            <p className="text-xs text-destructive mt-2">
+              {createBookingMutation.error?.message || "Error creating booking"}
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>
