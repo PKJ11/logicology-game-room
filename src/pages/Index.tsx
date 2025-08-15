@@ -20,6 +20,10 @@ import {
 } from "@/services/room.service";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
+import GamesInventory from "@/components/GamesInventory";
+import { InventoryCard } from "@/components/InventoryCard";
+import { useNavigate } from "react-router-dom";
+
 
 const Index = () => {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
@@ -29,28 +33,293 @@ const Index = () => {
     email: string;
     role: string;
   } | null>(null);
+  const navigate = useNavigate();
 
   const decodeJWT = (token: string) => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(window.atob(base64));
-  } catch (error) {
-    console.error('Error decoding JWT:', error);
-    return null;
-  }
-};
+    try {
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      return JSON.parse(window.atob(base64));
+    } catch (error) {
+      console.error("Error decoding JWT:", error);
+      return null;
+    }
+  };
 
+  const gamesData = [
+    {
+      game: "Barrel of Monkeys",
+      qty: 1,
+      players_min: 1,
+      players_max: 6,
+      play_time_mins: "10",
+      age_group: "3+",
+      bgg_rating: null,
+      bgg_overall_ranking: 28889,
+      categories: ["Action/ Dexterity", "Animals", "Children's Game"],
+      mechanisms: ["Physical Removal"],
+    },
+    {
+      game: "Battleship",
+      qty: 1,
+      players_min: 2,
+      players_max: 2,
+      play_time_mins: "30",
+      age_group: "8",
+      bgg_rating: null,
+      bgg_overall_ranking: 28895,
+      categories: ["Nautical", "Wargame", "Children's Game"],
+      mechanisms: [
+        "Deduction",
+        "Paper-and-Pencil",
+        "Secret Unit Deployment",
+        null,
+      ],
+    },
+    {
+      game: "Blink",
+      qty: 1,
+      players_min: 2,
+      players_max: 3,
+      play_time_mins: "10",
+      age_group: "7+",
+      bgg_rating: null,
+      bgg_overall_ranking: 5827,
+      categories: [
+        "Action/ Dexterity",
+        "Card Game",
+        "Children's Game",
+        "Real-time",
+        "Sports",
+      ],
+      mechanisms: [
+        "Hand Management",
+        "Pattern Recognition",
+        "Speed Matching",
+        null,
+      ],
+    },
+    {
+      game: "Boggle Slam",
+      qty: 1,
+      players_min: 2,
+      players_max: 4,
+      play_time_mins: "15",
+      age_group: "8+",
+      bgg_rating: null,
+      bgg_overall_ranking: 28797,
+      categories: ["Card Game", "Real-time", "Word Game"],
+      mechanisms: ["Real-time", "Spelling", null, null],
+    },
+    {
+      game: "Bold",
+      qty: 1,
+      players_min: 2,
+      players_max: 4,
+      play_time_mins: "10-30",
+      age_group: "7+",
+      bgg_rating: null,
+      bgg_overall_ranking: 22543,
+      categories: ["Card Game"],
+      mechanisms: ["Memory", "Push Your luck", null, null],
+    },
+    {
+      game: "6 CSK (Kaadoo)",
+      qty: 1,
+      players_min: null,
+      players_max: null,
+      play_time_mins: null,
+      age_group: null,
+      bgg_rating: null,
+      bgg_overall_ranking: null,
+      categories: [],
+      mechanisms: [],
+    },
+    {
+      game: "6 KKR (Kaadoo)",
+      qty: 1,
+      players_min: null,
+      players_max: null,
+      play_time_mins: null,
+      age_group: null,
+      bgg_rating: null,
+      bgg_overall_ranking: null,
+      categories: [],
+      mechanisms: [],
+    },
+    {
+      game: "Abalone - marble push",
+      qty: 1,
+      players_min: 2,
+      players_max: 2,
+      play_time_mins: "30",
+      age_group: "7+",
+      bgg_rating: null,
+      bgg_overall_ranking: null,
+      categories: ["Abstract Stategy"],
+      mechanisms: [
+        "Grid Movement",
+        "Hexagon Grid",
+        "Slide/ Push",
+        "Static Capture",
+      ],
+    },
+    {
+      game: "Backgammon",
+      qty: 1,
+      players_min: null,
+      players_max: null,
+      play_time_mins: null,
+      age_group: null,
+      bgg_rating: null,
+      bgg_overall_ranking: null,
+      categories: [],
+      mechanisms: [],
+    },
+    {
+      game: "Bounce Off",
+      qty: 1,
+      players_min: 2,
+      players_max: 4,
+      play_time_mins: "15",
+      age_group: "7+",
+      bgg_rating: null,
+      bgg_overall_ranking: 15373,
+      categories: ["Action/ Dexterity", "Party Game"],
+      mechanisms: ["Pattern Building", null, null, null],
+    },
+    {
+      game: "Brainvita",
+      qty: 1,
+      players_min: 1,
+      players_max: 2,
+      play_time_mins: "15",
+      age_group: "6+",
+      bgg_rating: null,
+      bgg_overall_ranking: 28872,
+      categories: ["Abstract Stategy"],
+      mechanisms: ["Point-to-Point Movement", null, null, null],
+    },
+    {
+      game: "Carcassonne",
+      qty: 1,
+      players_min: 2,
+      players_max: 5,
+      play_time_mins: "30-45",
+      age_group: "7+",
+      bgg_rating: null,
+      bgg_overall_ranking: 233,
+      categories: ["Medieval", "Territory Building"],
+      mechanisms: [
+        "Area Majority / Influence",
+        "Enclosure",
+        "Kill Steal",
+        "Map Addition",
+      ],
+    },
+    {
+      game: "Cascadia",
+      qty: 1,
+      players_min: 1,
+      players_max: 4,
+      play_time_mins: "30-45",
+      age_group: "10+",
+      bgg_rating: 7.9,
+      bgg_overall_ranking: 54,
+      categories: ["Animal", "Environment"],
+      mechanisms: [
+        "End Game Bonuses",
+        "Hexagon Grid",
+        "Open Drafting",
+        "Solo / Solitaire",
+      ],
+    },
+    {
+      game: "Catan",
+      qty: 1,
+      players_min: 3,
+      players_max: 4,
+      play_time_mins: "60-120",
+      age_group: "10+",
+      bgg_rating: 7.1,
+      bgg_overall_ranking: 595,
+      categories: ["Economic", "Negotiation"],
+      mechanisms: [
+        "Chaining",
+        "Dice Rolling",
+        "Hand Management",
+        "Hexagon Grid",
+      ],
+    },
+    {
+      game: "Chess",
+      qty: 1,
+      players_min: 2,
+      players_max: 2,
+      play_time_mins: null,
+      age_group: "6+",
+      bgg_rating: 7.2,
+      bgg_overall_ranking: 453,
+      categories: ["Abstract Stategy"],
+      mechanisms: [
+        "Grid Movement",
+        "Once-Per-Game Abilities",
+        "Pattern Movemet",
+        "Square Grid",
+      ],
+    },
+    {
+      game: "Chess (Wooden)",
+      qty: 1,
+      players_min: null,
+      players_max: null,
+      play_time_mins: null,
+      age_group: null,
+      bgg_rating: null,
+      bgg_overall_ranking: null,
+      categories: [],
+      mechanisms: [],
+    },
+    {
+      game: "Chicken Shuffle Jr",
+      qty: 1,
+      players_min: 1,
+      players_max: 1,
+      play_time_mins: null,
+      age_group: null,
+      bgg_rating: null,
+      bgg_overall_ranking: null,
+      categories: [],
+      mechanisms: [],
+    },
+    {
+      game: "Chinese Checkers",
+      qty: 1,
+      players_min: 2,
+      players_max: 6,
+      play_time_mins: "30",
+      age_group: "7+",
+      bgg_rating: 5.2,
+      bgg_overall_ranking: 28846,
+      categories: ["Abstract Strategy"],
+      mechanisms: [
+        "Enclosure",
+        "Grid Movement",
+        "Point to Point Movement",
+        "Race",
+      ],
+    },
+  ];
   // Check authentication on component mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       const decoded = decodeJWT(token);
       if (decoded) {
         const userData = {
           username: decoded.id, // or use appropriate field from your JWT
-          email: '', // add if available in JWT
-          role: '' // add if available in JWT
+          email: "", // add if available in JWT
+          role: "", // add if available in JWT
         };
         setUser(userData);
       }
@@ -58,15 +327,12 @@ const Index = () => {
   }, []);
 
   const isAuthenticated = !!user;
-  const userName = localStorage.getItem('user')
-  
-
+  const userName = localStorage.getItem("user");
 
   const { data: rooms } = useQuery<Room[]>({
     queryKey: ["rooms"],
     queryFn: roomService.getAllRooms,
   });
-  
 
   const { data: availability } = useQuery<RoomAvailability[]>({
     queryKey: ["rooms-availability", today],
@@ -106,7 +372,7 @@ const Index = () => {
           </div>
 
           {/* Auth Buttons */}
-            <div className="flex justify-center gap-4 mt-6">
+          <div className="flex justify-center gap-4 mt-6">
             {isAuthenticated ? (
               <div className="flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-full">
                 <User className="h-4 w-4" />
@@ -302,6 +568,58 @@ const Index = () => {
           </CardContent>
         </Card>
       </section>
+      <Card className="gaming-card mt-12">
+  <CardHeader>
+    <div className="flex justify-between items-center">
+      <CardTitle className="flex items-center gap-2">
+        <Gamepad2 className="h-6 w-6 text-primary" />
+        Game Inventory
+      </CardTitle>
+      <Button 
+        variant="outline" 
+        onClick={() => navigate('/games')}
+        className="btn-neon"
+      >
+        View All Games
+      </Button>
+    </div>
+  </CardHeader>
+  <CardContent>
+    {/* Featured Games Grid */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+      {gamesData.slice(0, 4).map((game) => (
+        <Card key={game.game} className="hover:bg-muted/50 transition-colors h-full">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">{game.game}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-1 text-sm">
+              <span className="text-muted-foreground">Players:</span>
+              {game.players_min && game.players_max ? (
+                <span>{game.players_min}-{game.players_max}</span>
+              ) : (
+                <span>N/A</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <span className="text-muted-foreground">Time:</span>
+              <span>{game.play_time_mins || "N/A"} mins</span>
+            </div>
+            {game.age_group && (
+              <div className="flex items-center gap-1 text-sm">
+                <span className="text-muted-foreground">Age:</span>
+                <span>{game.age_group}+</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+
+    {/* Full Inventory Card */}
+    <InventoryCard />
+  </CardContent>
+</Card>
     </div>
   );
 };
